@@ -20,122 +20,139 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class HealthPlanAvailabilityHelper {
 
 	public void execute(HealthPlanRequest request) {
-		System.out.println("inside healthPlan execute************************");
-		MongoClient client = null;
+	    System.out.println("inside healthPlan execute************************");
+	    MongoClient client = null;
 
-		try {
-			if (request == null || request.getSourceSystem() == null) {
-				System.err.println("Invalid request");
-				return;
-			}
+	    try {
+	        if (request == null || request.getSourceSystem() == null) {
+	            System.err.println("Invalid request");
+	            return;
+	        }
 
-			// Create ObjectMapper with JSR310 module
-			ObjectMapper mapper = new ObjectMapper();
-			mapper.registerModule(new JavaTimeModule()); // Add this line
+	        // Create ObjectMapper with JSR310 module
+	        ObjectMapper mapper = new ObjectMapper();
+	        mapper.registerModule(new JavaTimeModule());
 
-			String dbName = "udpdev";
-			client = MongoClientFactory.getInstance().getConnection("aws", dbName);
-			MongoDatabase mongoDb = client.getDatabase(dbName);
-			MongoCollection<Document> planChoiceCollection = mongoDb.getCollection("healthManagementPlanChoice");
+	        String dbName = "udpdev";
+	        client = MongoClientFactory.getInstance().getConnection("aws", dbName);
+	        MongoDatabase mongoDb = client.getDatabase(dbName);
+	        MongoCollection<Document> planChoiceCollection = mongoDb.getCollection("healthManagementPlanChoice");
 
-			String referenceId = populateHpccReferenceId(request.getSourceSystem()).toString();
-			Document filter = new Document("healthManagementPlanChoiceReferenceId", referenceId);
+	        String referenceId = populateHpccReferenceId(request.getSourceSystem()).toString();
+	        Document filter = new Document("healthManagementPlanChoiceReferenceId", referenceId);
 
-			Document result = planChoiceCollection.find(filter).first();
+	        Document result = planChoiceCollection.find(filter).first();
 
-			// Convert HealthPlanRequest to Map, then to Document
-			@SuppressWarnings("unchecked")
-			Map<String, Object> requestMap = mapper.convertValue(request, Map.class);
-			Document healthPlanDetailsDoc = new Document(requestMap);
+	        // Convert HealthPlanRequest to Map, then to Document
+	        @SuppressWarnings("unchecked")
+	        Map<String, Object> requestMap = mapper.convertValue(request, Map.class);
+	        Document healthPlanDetailsDoc = new Document(requestMap);
 
-			if (result != null) {
+	        if (result != null) {
+	            System.out.println("Document found. Checking for existing supplimentalHealthPlanData...");
 
-		        System.out.println("Document found. Merging plans...");
+	            // Get existing supplimentalHealthPlanData
+	            Document existingSupplementalData = (Document) result.get("supplimentalHealthPlanData");
 
-		        // Get existing healthPlanDetails
-		        Document existingHealthPlanDetails = (Document) result.get("healthPlanDetails");
-		        List<Document> existingPlans = (List<Document>) existingHealthPlanDetails.get("plans");
-		        
-		        // Convert request plans to Documents
-		        @SuppressWarnings("unchecked")
-		        List<Map<String, Object>> requestPlansAsMap = mapper.convertValue(request.getPlans(), 
-		            mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
-		        List<Document> requestPlans = requestPlansAsMap.stream()
-		            .map(Document::new)
-		            .collect(java.util.stream.Collectors.toList());
+	            if (existingSupplementalData == null) {
+	                // supplimentalHealthPlanData doesn't exist - Create new one
+	                System.out.println("supplimentalHealthPlanData not found. Creating new one...");
 
-		        // Merge plans: Update existing or add new
-		        for (Document requestPlan : requestPlans) {
-		            String requestPlanType = requestPlan.getString("planType");
-		            boolean planFound = false;
+	                Document newSupplementalData = new Document()
+	                    .append("sourceSystem", request.getSourceSystem())
+	                    .append("clientId", request.getClientId())
+	                    .append("plans", convertPlansToDocuments(mapper, request.getPlans()));
 
-		            // Check if plan with same planType exists
-		            for (int i = 0; i < existingPlans.size(); i++) {
-		                Document existingPlan = existingPlans.get(i);
-		                String existingPlanType = existingPlan.getString("planType");
+	                Document updateDoc = new Document("$set",
+	                    new Document()
+	                        .append("supplimentalHealthPlanData", newSupplementalData)
+	                        .append("lastModifiedTimestamp", formatTimestamp(System.currentTimeMillis()))
+	                        .append("version", result.getInteger("version", 1) + 1));
 
-		                if (existingPlanType != null && existingPlanType.equals(requestPlanType)) {
-		                    // Plan with same type found - Update it
-		                    System.out.println("Plan with type '" + requestPlanType + "' found. Updating...");
-		                    existingPlans.set(i, requestPlan);
-		                    planFound = true;
-		                    break;
-		                }
-		            }
+	                planChoiceCollection.updateOne(filter, updateDoc);
+	                System.out.println("New supplimentalHealthPlanData created successfully");
 
-		            // If plan type not found - Add as new entry
-		            if (!planFound) {
-		                System.out.println("Plan with type '" + requestPlanType + "' not found. Creating new entry...");
-		                existingPlans.add(requestPlan);
-		            }
-		        }
+	            } else {
+	                // supplimentalHealthPlanData exists - Merge plans
+	                System.out.println("supplimentalHealthPlanData found. Merging plans...");
 
-		        // Convert thresholdReportData
-		        @SuppressWarnings("unchecked")
-		        List<Map<String, Object>> thresholdAsMap = mapper.convertValue(request.getThresholdReportData(), 
-		            mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
-		        List<Document> thresholdDocs = thresholdAsMap.stream()
-		            .map(Document::new)
-		            .collect(java.util.stream.Collectors.toList());
+	                List<Document> existingPlans = (List<Document>) existingSupplementalData.get("plans");
 
-		        // Create updated healthPlanDetails
-		        Document updatedHealthPlanDetails = new Document()
-		            .append("sourceSystem", request.getSourceSystem())
-		            .append("clientId", request.getClientId())
-		            .append("plans", existingPlans)  // Merged plans
-		            .append("thresholdReportData", thresholdDocs);
+	                // Handle null case for existing plans
+	                if (existingPlans == null) {
+	                    existingPlans = new ArrayList<>();
+	                    System.out.println("No existing plans found. Creating new plans list...");
+	                }
 
-		        // Update document in database
-		        Document updateDoc = new Document("$set",
-		            new Document()
-		                .append("healthPlanDetails", updatedHealthPlanDetails)
-		                .append("lastModifiedTimestamp", formatTimestamp(System.currentTimeMillis()))
-		                .append("version", result.getInteger("version", 1) + 1));
+	                // Convert request plans to Documents
+	                List<Document> requestPlans = convertPlansToDocuments(mapper, request.getPlans());
 
-		        planChoiceCollection.updateOne(filter, updateDoc);
-		        System.out.println("Document updated successfully with merged plans");
-		        printMergedPlansInfo(existingPlans);
-			} else {
-				System.out.println("Creating new document...");
+	                // Merge plans: Update existing or add new
+	                for (Document requestPlan : requestPlans) {
+	                    String requestPlanType = requestPlan.getString("planType");
+	                    boolean planFound = false;
 
-				Document newDoc = new Document().append("healthManagementPlanChoiceReferenceId", referenceId)
-						.append("normalizedClientId", "19968E")
-						.append("sourceSystem", request.getSourceSystem())
-						.append("sourceSchemaName", request.getSourceSystem())
-						.append("healthPlanDetails", healthPlanDetailsDoc)
-						.append("sourceSystemTimestamp", formatTimestamp(System.currentTimeMillis()))
-						.append("lastModifiedTimestamp", formatTimestamp(System.currentTimeMillis()))
-						.append("isActive", true).append("version", 1);
+	                    // Check if plan with same planType exists
+	                    for (int i = 0; i < existingPlans.size(); i++) {
+	                        Document existingPlan = existingPlans.get(i);
+	                        String existingPlanType = existingPlan.getString("planType");
 
-				planChoiceCollection.insertOne(newDoc);
-				System.out.println("New document created successfully");
-			}
+	                        if (existingPlanType != null && existingPlanType.equals(requestPlanType)) {
+	                            // Plan with same type found - Update it
+	                            System.out.println("Plan with type '" + requestPlanType + "' found. Updating...");
+	                            existingPlans.set(i, requestPlan);
+	                            planFound = true;
+	                            break;
+	                        }
+	                    }
 
-		} catch (Exception e) {
-			System.err.println("Error: " + e.getMessage());
-			e.printStackTrace();
-		} 
-	}
+	                    // If plan type not found - Add as new entry
+	                    if (!planFound) {
+	                        System.out.println("Plan with type '" + requestPlanType + "' not found. Creating new entry...");
+	                        existingPlans.add(requestPlan);
+	                    }
+	                }
+
+	                // Create updated supplimentalHealthPlanData
+	                Document updatedSupplementalData = new Document()
+	                    .append("sourceSystem", request.getSourceSystem())
+	                    .append("clientId", request.getClientId())
+	                    .append("plans", existingPlans);
+
+	                // Update document in database
+	                Document updateDoc = new Document("$set",
+	                    new Document()
+	                        .append("supplimentalHealthPlanData", updatedSupplementalData)
+	                        .append("lastModifiedTimestamp", formatTimestamp(System.currentTimeMillis()))
+	                        .append("version", result.getInteger("version", 1) + 1));
+
+	                planChoiceCollection.updateOne(filter, updateDoc);
+	                System.out.println("Document updated successfully with merged plans");
+	                printMergedPlansInfo(existingPlans);
+	            }
+
+	        } else {
+	            System.out.println("Document not found. Creating new document...");
+
+	            Document newDoc = new Document()
+	                .append("healthManagementPlanChoiceReferenceId", referenceId)
+	                .append("normalizedClientId", "19968E")
+	                .append("sourceSystem", request.getSourceSystem())
+	                .append("sourceSchemaName", "T1PL030E")
+	                .append("supplimentalHealthPlanData", healthPlanDetailsDoc)
+	                .append("sourceSystemTimestamp", formatTimestamp(System.currentTimeMillis()))
+	                .append("lastModifiedTimestamp", formatTimestamp(System.currentTimeMillis()))
+	                .append("isActive", true)
+	                .append("version", 1);
+
+	            planChoiceCollection.insertOne(newDoc);
+	            System.out.println("New document created successfully");
+	        }
+
+	    } catch (Exception e) {
+	        System.err.println("Error: " + e.getMessage());
+	        e.printStackTrace();
+	    }}
 
 	private StringBuilder populateHpccReferenceId(String sourceSystem) {
 		StringBuilder healthManagementPlanChoiceReferenceId = new StringBuilder();
@@ -159,5 +176,15 @@ public class HealthPlanAvailabilityHelper {
 	    System.out.println("Total plans: " + plans.size());
 	    System.out.println("================================\n");
 	}
-	
+	/**
+	 * Helper method to convert plans to Documents
+	 */
+	private List<Document> convertPlansToDocuments(ObjectMapper mapper, List<?> plans) {
+	    @SuppressWarnings("unchecked")
+	    List<Map<String, Object>> plansAsMap = mapper.convertValue(plans,
+	        mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+	    return plansAsMap.stream()
+	        .map(Document::new)
+	        .collect(java.util.stream.Collectors.toList());
+	}
 }

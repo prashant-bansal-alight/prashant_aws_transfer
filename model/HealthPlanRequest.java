@@ -40,8 +40,7 @@ public class HealthPlanRequest implements Serializable{
   @JsonProperty("plans")
   private List<Plan> plans = new ArrayList<>();
 
-  @JsonProperty("thresholdReportData")
-  private List<ThresholdReport> thresholdReportData = null;
+  
 
   public HealthPlanRequest sourceSystem(String sourceSystem) {
     this.sourceSystem = sourceSystem;
@@ -102,31 +101,7 @@ public class HealthPlanRequest implements Serializable{
     this.plans = plans;
   }
 
-  public HealthPlanRequest thresholdReportData(List<ThresholdReport> thresholdReportData) {
-    this.thresholdReportData = thresholdReportData;
-    return this;
-  }
-
-  public HealthPlanRequest addThresholdReportDataItem(ThresholdReport thresholdReportDataItem) {
-    if (this.thresholdReportData == null) {
-      this.thresholdReportData = new ArrayList<>();
-    }
-    this.thresholdReportData.add(thresholdReportDataItem);
-    return this;
-  }
-
-   /**
-   * Get thresholdReportData
-   * @return thresholdReportData
-  **/
-  @Schema(description = "")
-  public List<ThresholdReport> getThresholdReportData() {
-    return thresholdReportData;
-  }
-
-  public void setThresholdReportData(List<ThresholdReport> thresholdReportData) {
-    this.thresholdReportData = thresholdReportData;
-  }
+  
 
 
   @Override
@@ -140,13 +115,12 @@ public class HealthPlanRequest implements Serializable{
     HealthPlanRequest healthPlanRequest = (HealthPlanRequest) o;
     return Objects.equals(this.sourceSystem, healthPlanRequest.sourceSystem) &&
         Objects.equals(this.clientId, healthPlanRequest.clientId) &&
-        Objects.equals(this.plans, healthPlanRequest.plans) &&
-        Objects.equals(this.thresholdReportData, healthPlanRequest.thresholdReportData);
+        Objects.equals(this.plans, healthPlanRequest.plans);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(sourceSystem, clientId, plans, thresholdReportData);
+    return Objects.hash(sourceSystem, clientId, plans);
   }
 
 
@@ -158,7 +132,7 @@ public class HealthPlanRequest implements Serializable{
     sb.append("    sourceSystem: ").append(toIndentedString(sourceSystem)).append("\n");
     sb.append("    clientId: ").append(toIndentedString(clientId)).append("\n");
     sb.append("    plans: ").append(toIndentedString(plans)).append("\n");
-    sb.append("    thresholdReportData: ").append(toIndentedString(thresholdReportData)).append("\n");
+   
     sb.append("}");
     return sb.toString();
   }

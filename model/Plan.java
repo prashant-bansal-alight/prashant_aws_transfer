@@ -45,7 +45,9 @@ public class Plan implements Serializable{
 
   @JsonProperty("options")
   private List<PlanOption> options = null;
-
+  @JsonProperty("thresholdReportData")
+  private List<ThresholdReport> thresholdReportData = null;
+  
   public Plan planId(String planId) {
     this.planId = planId;
     return this;
@@ -82,7 +84,7 @@ public class Plan implements Serializable{
     this.planType = planType;
   }
 
-  public Plan effectiveBeginDate(LocalDate effectiveBeginDate) {
+  public Plan effectiveBeginDate(String effectiveBeginDate) {
     this.effectiveBeginDate = effectiveBeginDate;
     return this;
   }
@@ -92,15 +94,15 @@ public class Plan implements Serializable{
    * @return effectiveBeginDate
   **/
   @Schema(required = true, description = "")
-  public LocalDate getEffectiveBeginDate() {
+  public String getEffectiveBeginDate() {
     return effectiveBeginDate;
   }
 
-  public void setEffectiveBeginDate(LocalDate effectiveBeginDate) {
+  public void setEffectiveBeginDate(String effectiveBeginDate) {
     this.effectiveBeginDate = effectiveBeginDate;
   }
 
-  public Plan effectiveEndDate(LocalDate effectiveEndDate) {
+  public Plan effectiveEndDate(String effectiveEndDate) {
     this.effectiveEndDate = effectiveEndDate;
     return this;
   }
@@ -110,11 +112,11 @@ public class Plan implements Serializable{
    * @return effectiveEndDate
   **/
   @Schema(required = true, description = "")
-  public LocalDate getEffectiveEndDate() {
+  public String getEffectiveEndDate() {
     return effectiveEndDate;
   }
 
-  public void setEffectiveEndDate(LocalDate effectiveEndDate) {
+  public void setEffectiveEndDate(String effectiveEndDate) {
     this.effectiveEndDate = effectiveEndDate;
   }
 
@@ -143,8 +145,33 @@ public class Plan implements Serializable{
   public void setOptions(List<PlanOption> options) {
     this.options = options;
   }
+  
+  public Plan thresholdReportData(List<ThresholdReport> thresholdReportData) {
+	    this.thresholdReportData = thresholdReportData;
+	    return this;
+	  }
 
+	  public Plan addThresholdReportDataItem(ThresholdReport thresholdReportDataItem) {
+	    if (this.thresholdReportData == null) {
+	      this.thresholdReportData = new ArrayList<>();
+	    }
+	    this.thresholdReportData.add(thresholdReportDataItem);
+	    return this;
+	  }
 
+	   /**
+	   * Get thresholdReportData
+	   * @return thresholdReportData
+	  **/
+	  @Schema(description = "")
+	  public List<ThresholdReport> getThresholdReportData() {
+	    return thresholdReportData;
+	  }
+
+	  public void setThresholdReportData(List<ThresholdReport> thresholdReportData) {
+	    this.thresholdReportData = thresholdReportData;
+	  }
+  
   @Override
   public boolean equals(java.lang.Object o) {
     if (this == o) {
@@ -158,12 +185,13 @@ public class Plan implements Serializable{
         Objects.equals(this.planType, plan.planType) &&
         Objects.equals(this.effectiveBeginDate, plan.effectiveBeginDate) &&
         Objects.equals(this.effectiveEndDate, plan.effectiveEndDate) &&
-        Objects.equals(this.options, plan.options);
+        Objects.equals(this.options, plan.options) &&
+        Objects.equals(this.thresholdReportData, plan.thresholdReportData);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(planId, planType, effectiveBeginDate, effectiveEndDate, options);
+    return Objects.hash(planId, planType, effectiveBeginDate, effectiveEndDate, options, thresholdReportData);
   }
 
 
@@ -177,6 +205,7 @@ public class Plan implements Serializable{
     sb.append("    effectiveBeginDate: ").append(toIndentedString(effectiveBeginDate)).append("\n");
     sb.append("    effectiveEndDate: ").append(toIndentedString(effectiveEndDate)).append("\n");
     sb.append("    options: ").append(toIndentedString(options)).append("\n");
+    sb.append("    thresholdReportData: ").append(toIndentedString(thresholdReportData)).append("\n");
     sb.append("}");
     return sb.toString();
   }
